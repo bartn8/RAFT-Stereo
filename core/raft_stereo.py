@@ -67,9 +67,10 @@ class RAFTStereo(nn.Module):
         return up_flow.reshape(N, D, factor*H, factor*W)
 
 
-    def forward(self, image1, image2, iters=12, flow_init=None, test_mode=False):
+    def forward(self, image0, image1, image2, iters=12, flow_init=None, test_mode=False):
         """ Estimate optical flow between pair of frames """
 
+        image0 = (2 * (image0 / 255.0) - 1.0).contiguous()
         image1 = (2 * (image1 / 255.0) - 1.0).contiguous()
         image2 = (2 * (image2 / 255.0) - 1.0).contiguous()
 
@@ -79,7 +80,7 @@ class RAFTStereo(nn.Module):
                 *cnet_list, x = self.cnet(torch.cat((image1, image2), dim=0), dual_inp=True, num_layers=self.args.n_gru_layers)
                 fmap1, fmap2 = self.conv2(x).split(dim=0, split_size=x.shape[0]//2)
             else:
-                cnet_list = self.cnet(image1, num_layers=self.args.n_gru_layers)
+                cnet_list = self.cnet(image0, num_layers=self.args.n_gru_layers)
                 fmap1, fmap2 = self.fnet([image1, image2])
             net_list = [torch.tanh(x[0]) for x in cnet_list]
             inp_list = [torch.relu(x[1]) for x in cnet_list]
