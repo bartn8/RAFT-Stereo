@@ -34,7 +34,7 @@ class RAFTStereoParams:
         self.corr_levels = 4
         self.n_gru_layers = 3
         self.slow_fast_gru = False
-        self.valid_iters = 32
+        self.valid_iters = 7
 
 class RAFTStereoBLock:
     def __init__(self, device = "cpu", use_fast = True, verbose=False): 
@@ -45,6 +45,7 @@ class RAFTStereoBLock:
         self.device = device
         self.use_fast = use_fast
         self.model_params = FastRAFTStereoParams() if use_fast else RAFTStereoParams()
+        self.disposed = False
 
     def log(self, x):
         if self.verbose:
@@ -61,11 +62,14 @@ class RAFTStereoBLock:
         self.model = torch.nn.DataParallel(raft_stereo.RAFTStereo(self.model_params), device_ids=[0])
 
     def load(self, model_path):
-        model.load_state_dict(torch.load(model_path, map_location=torch.device(self.device)))
+        self.log("Loading frozen model")
+        self.log(f"Model checkpoint path: {model_path}")
 
-        model = model.module
-        model.to(self.device)
-        model.eval()
+        self.model.load_state_dict(torch.load(model_path, map_location=torch.device(self.device)))
+
+        self.model = self.model.module
+        self.model.to(self.device)
+        self.model.eval()
 
 
     def dispose(self):
@@ -82,20 +86,23 @@ class RAFTStereoBLock:
         img = torch.from_numpy(img).permute(2, 0, 1).float()
         return img[None].to(self.device)
 
-    def test(self, left, left_vpp, right_vpp):
+    def test(self, left, right, left_vpp, right_vpp):
         #Input conversion
         left = self._conv_image(left)
+        right = self._conv_image(right)
         left_vpp = self._conv_image(left_vpp)
         right_vpp = self._conv_image(right_vpp)
 
         with torch.no_grad():
             padder = utils.InputPadder(left.shape, divis_by=32)
-            left, left_vpp, right_vpp = padder.pad(left, left_vpp, right_vpp)
+            left, right, left_vpp, right_vpp = padder.pad(left, right, left_vpp, right_vpp)
 
-            _, flow_up = self.model(left, left_vpp, right_vpp, iters=self.model_params.valid_iters, test_mode=True)
+            _, flow_up = self.model(left, right, left_vpp, right_vpp, iters=self.model_params.valid_iters, test_mode=True)
 
             flow_pr = padder.unpad(flow_up.float()).cpu().squeeze(0)
 
             dmap = flow_pr.cpu().numpy().squeeze()
             dmap = -dmap
+
+            return dmap
             

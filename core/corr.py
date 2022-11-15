@@ -1,6 +1,9 @@
 import torch
 import torch.nn.functional as F
-from core.utils.utils import bilinear_sampler
+
+import importlib
+core_utils_utils = importlib.import_module("thirdparty.RAFT-Stereo.core.utils.utils")
+
 
 try:
     import corr_sampler
@@ -138,7 +141,7 @@ class CorrBlock1D:
             y0 = torch.zeros_like(x0)
 
             coords_lvl = torch.cat([x0,y0], dim=-1)
-            corr = bilinear_sampler(corr, coords_lvl)
+            corr = core_utils_utils.bilinear_sampler(corr, coords_lvl)
             corr = corr.view(batch, h1, w1, -1)
             out_pyramid.append(corr)
 
