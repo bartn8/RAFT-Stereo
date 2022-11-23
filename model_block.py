@@ -34,7 +34,7 @@ class RAFTStereoParams:
         self.corr_levels = 4
         self.n_gru_layers = 3
         self.slow_fast_gru = False
-        self.valid_iters = 7
+        self.valid_iters = 32
 
 class RAFTStereoBLock:
     def __init__(self, device = "cpu", use_fast = True, verbose=False): 
