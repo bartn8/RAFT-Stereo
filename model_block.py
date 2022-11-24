@@ -59,8 +59,7 @@ class RAFTStereoBLock:
         logline = "fast" if self.use_fast else ""
         self.log(f"Building Model RAFT-stereo {logline} ...")
 
-        self.model = torch.nn.DataParallel(raft_stereo.RAFTStereo(self.model_params))
-        self.model.to(self.device)
+        self.model = torch.nn.DataParallel(raft_stereo.RAFTStereo(self.model_params)).to(self.device)
 
     def load(self, model_path):
         self.log("Loading frozen model")
