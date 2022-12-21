@@ -9,6 +9,7 @@ utils = importlib.import_module("thirdparty.RAFT-Stereo.core.utils.utils")
 import numpy as np
 import torch
 import cv2
+import gc
 
 class FastRAFTStereoParams:
     def __init__(self) -> None:
@@ -75,6 +76,8 @@ class RAFTStereoBLock:
     def dispose(self):
         if not self.disposed:
             del self.model
+            gc.collect()
+            torch.cuda.empty_cache()
             self.disposed = True
 
     def _conv_image(self,img):
