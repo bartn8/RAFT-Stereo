@@ -109,3 +109,28 @@ class RAFTStereoBLock:
 
             return dmap
             
+    def vpp_train(self, left, right, left_vpp, right_vpp):
+        #Input conversion
+        left = self._conv_image(left)
+        right = self._conv_image(right)
+
+        # Assume that a vpp network already do _conv_image
+        # left_vpp = self._conv_image(left_vpp)
+        # right_vpp = self._conv_image(right_vpp)
+
+        # Freeze model, but enable backprop
+        for param in self.model.parameters():
+            param.requires_grad = False
+        
+        padder = utils.InputPadder(left.shape, divis_by=32)
+        left, right, left_vpp, right_vpp = padder.pad(left, right, left_vpp, right_vpp)
+
+        _, flow_up = self.model(left, right, left_vpp, right_vpp, iters=self.model_params.valid_iters, test_mode=True)
+
+        flow_pr = padder.unpad(flow_up.float()).squeeze(0)
+
+        dmap = flow_pr.squeeze()
+        dmap = -dmap
+
+        return dmap
+            
