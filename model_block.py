@@ -29,8 +29,8 @@ class RAFTStereoParams:
         self.hidden_dims = [128]*3
         self.n_downsample = 2
         self.shared_backbone = False
-        self.mixed_precision = True
-        self.corr_implementation = "alt"
+        self.mixed_precision = False
+        self.corr_implementation = "reg"
         self.corr_radius = 4
         self.corr_levels = 4
         self.n_gru_layers = 3
