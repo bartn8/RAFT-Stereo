@@ -80,14 +80,22 @@ class RAFTStereoBLock:
             torch.cuda.empty_cache()
             self.disposed = True
 
-    def _conv_image(self,img):
-        if len(img.shape) < 3:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-        else:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    def _conv_image(self,imgs):
+        if not isinstance(imgs, list):
+            imgs = [imgs]
 
-        img = torch.from_numpy(img).permute(2, 0, 1).float()
-        return img[None].to(self.device)
+        conv_list = []
+
+        for img in imgs:
+            if len(img.shape) < 3:
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            else:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+            img = torch.from_numpy(img).permute(2, 0, 1).float()
+            conv_list.append(img.unsqueeze(0).to(self.device))
+        
+        return torch.cat(conv_list, 0)
 
     def test(self, left, right, left_vpp, right_vpp):
         #Input conversion

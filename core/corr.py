@@ -32,12 +32,12 @@ class CorrSampler(torch.autograd.Function):
         return grad_volume, None, None
 
 class CorrBlockFast1D:
-    def __init__(self, fmap1, fmap2, num_levels=4, radius=4):
+    def __init__(self, fmap1, fmap2, num_levels=4, radius=4, rB=None, sB=None):
         self.num_levels = num_levels
         self.radius = radius
         self.corr_pyramid = []
         # all pairs correlation
-        corr = CorrBlockFast1D.corr(fmap1, fmap2)
+        corr = CorrBlockFast1D.corr(fmap1, fmap2, rB, sB)
         batch, h1, w1, dim, w2 = corr.shape
         corr = corr.reshape(batch*h1*w1, dim, 1, w2)
         for i in range(self.num_levels):
@@ -54,18 +54,41 @@ class CorrBlockFast1D:
         return torch.cat(out_pyramid, dim=1)
 
     @staticmethod
-    def corr(fmap1, fmap2):
+    def corr(fmap1, fmap2, rB, sB):
         B, D, H, W1 = fmap1.shape
         _, _, _, W2 = fmap2.shape
         fmap1 = fmap1.view(B, D, H, W1)
         fmap2 = fmap2.view(B, D, H, W2)
-        corr = torch.einsum('aijk,aijh->ajkh', fmap1, fmap2)
-        corr = corr.reshape(B, H, W1, 1, W2).contiguous()
+
+        assert sB == B, f"sB: {sB} B: {B}"
+
+        
+        if rB is not None and sB is not None:
+            n_projs = sB // rB
+            corr_list = []
+            for b in range(rB):
+                s_start = b * n_projs
+                s_end = (b+1) * n_projs  
+
+                tmp_corr = torch.zeros((1,H,W1,1,W2))
+
+                for sfmap1, sfmap2 in zip(fmap1[s_start:s_end], fmap2[s_start:s_end]):
+                    sfmap1 = sfmap1.unsqueeze(0)
+                    sfmap2 = sfmap2.unsqueeze(0)
+                    scorr = torch.einsum('aijk,aijh->ajkh', sfmap1, sfmap2)
+                    scorr = scorr.reshape(1, H, W1, 1, W2).contiguous()
+                    tmp_corr += scorr / n_projs
+
+
+                #Remove batch dim with mean and then restore it with list
+                corr_list.append(tmp_corr)
+            corr = torch.cat(corr_list, 0)
+
         return corr / torch.sqrt(torch.tensor(D).float())
 
 
 class PytorchAlternateCorrBlock1D:
-    def __init__(self, fmap1, fmap2, num_levels=4, radius=4):
+    def __init__(self, fmap1, fmap2, num_levels=4, radius=4, rB=None, sB=None):
         self.num_levels = num_levels
         self.radius = radius
         self.corr_pyramid = []
@@ -111,13 +134,13 @@ class PytorchAlternateCorrBlock1D:
 
 
 class CorrBlock1D:
-    def __init__(self, fmap1, fmap2, num_levels=4, radius=4):
+    def __init__(self, fmap1, fmap2, num_levels=4, radius=4, rB=None, sB=None):
         self.num_levels = num_levels
         self.radius = radius
         self.corr_pyramid = []
 
         # all pairs correlation
-        corr = CorrBlock1D.corr(fmap1, fmap2)
+        corr = CorrBlock1D.corr(fmap1, fmap2, rB, sB)
 
         batch, h1, w1, _, w2 = corr.shape
         corr = corr.reshape(batch*h1*w1, 1, 1, w2)
@@ -149,13 +172,37 @@ class CorrBlock1D:
         return out.permute(0, 3, 1, 2).contiguous().float()
 
     @staticmethod
-    def corr(fmap1, fmap2):
+    def corr(fmap1, fmap2, rB, sB):
         B, D, H, W1 = fmap1.shape
         _, _, _, W2 = fmap2.shape
         fmap1 = fmap1.view(B, D, H, W1)
         fmap2 = fmap2.view(B, D, H, W2)
-        corr = torch.einsum('aijk,aijh->ajkh', fmap1, fmap2)
-        corr = corr.reshape(B, H, W1, 1, W2).contiguous()
+
+        assert sB == B, f"sB: {sB} B: {B}"
+
+        if rB is not None and sB is not None:
+            n_projs = sB // rB
+            corr_list = []
+            for b in range(rB):
+                s_start = b * n_projs
+                s_end = (b+1) * n_projs  
+
+                device = fmap1.get_device()
+                device = f"cuda:{device}" if device >= 0 else "cpu"
+                tmp_corr = torch.zeros((1,H,W1,1,W2)).to(device)
+
+                for sfmap1, sfmap2 in zip(fmap1[s_start:s_end], fmap2[s_start:s_end]):
+                    sfmap1 = sfmap1.unsqueeze(0)
+                    sfmap2 = sfmap2.unsqueeze(0)
+                    scorr = torch.einsum('aijk,aijh->ajkh', sfmap1, sfmap2)
+                    scorr = scorr.reshape(1, H, W1, 1, W2).contiguous()
+                    tmp_corr += scorr / n_projs
+
+
+                #Remove batch dim with mean and then restore it with list
+                corr_list.append(tmp_corr)
+            corr = torch.cat(corr_list, 0)
+
         return corr / torch.sqrt(torch.tensor(D).float())
 
 

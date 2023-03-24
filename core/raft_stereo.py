@@ -77,6 +77,13 @@ class RAFTStereo(nn.Module):
         image2 = (2 * (image2 / 255.0) - 1.0).contiguous()
         image3 = (2 * (image3 / 255.0) - 1.0).contiguous()
 
+        #Suppose that image0, image1 are vanilla images and have real batch size
+        #Suppose that first n images of image2 and image3 are spacetime images of first batch and so on
+        real_batchsize = image0.shape[0]
+        spacetime_batchsize = image2.shape[0]
+        assert spacetime_batchsize % real_batchsize == 0
+        
+
         # run the context network
         with autocast(enabled=self.args.mixed_precision):
             if self.args.shared_backbone:
@@ -92,6 +99,8 @@ class RAFTStereo(nn.Module):
             # Rather than running the GRU's conv layers on the context features multiple times, we do it once at the beginning 
             inp_list = [list(conv(i).split(split_size=conv.out_channels//3, dim=1)) for i,conv in zip(inp_list, self.context_zqr_convs)]
 
+        #Accumulate active pattern inside corrBlock
+
         if self.args.corr_implementation == "reg": # Default
             corr_block = core_corr.CorrBlock1D
             fmap1, fmap2 = fmap1.float(), fmap2.float()
@@ -102,7 +111,8 @@ class RAFTStereo(nn.Module):
             corr_block = core_corr.CorrBlockFast1D
         elif self.args.corr_implementation == "alt_cuda": # Faster version of alt
             corr_block = core_corr.AlternateCorrBlock
-        corr_fn = corr_block(fmap1, fmap2, radius=self.args.corr_radius, num_levels=self.args.corr_levels)
+
+        corr_fn = corr_block(fmap1, fmap2, radius=self.args.corr_radius, num_levels=self.args.corr_levels, rB=real_batchsize, sB=spacetime_batchsize)
 
         coords0, coords1 = self.initialize_flow(net_list[0])
 
