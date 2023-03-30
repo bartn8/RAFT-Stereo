@@ -66,7 +66,8 @@ class RAFTStereoBLock:
         self.log("Loading frozen model")
         self.log(f"Model checkpoint path: {model_path}")
 
-        self.model.load_state_dict(torch.load(model_path, map_location=torch.device(self.device)))
+        state_dict = torch.load(model_path, map_location=torch.device(self.device))
+        self.model.load_state_dict(state_dict["state_dict"] if "state_dict" in state_dict else state_dict)
 
         self.model = self.model.module
         self.model.to(self.device)
@@ -97,7 +98,7 @@ class RAFTStereoBLock:
         
         return torch.cat(conv_list, 0)
 
-    def test(self, left, right, left_vpp, right_vpp):
+    def test(self, left, right, left_vpp, right_vpp, normalize=True):
         #Input conversion
         left = self._conv_image(left)
         right = self._conv_image(right)
@@ -108,7 +109,7 @@ class RAFTStereoBLock:
             padder = utils.InputPadder(left.shape, divis_by=32)
             left, right, left_vpp, right_vpp = padder.pad(left, right, left_vpp, right_vpp)
 
-            _, flow_up = self.model(left, right, left_vpp, right_vpp, iters=self.model_params.valid_iters, test_mode=True)
+            _, flow_up = self.model(left, right, left_vpp, right_vpp, iters=self.model_params.valid_iters, test_mode=True, normalize=normalize)
 
             flow_pr = padder.unpad(flow_up.float()).cpu().squeeze(0)
 

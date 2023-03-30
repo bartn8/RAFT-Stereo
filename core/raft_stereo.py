@@ -69,13 +69,20 @@ class RAFTStereo(nn.Module):
         return up_flow.reshape(N, D, factor*H, factor*W)
 
 
-    def forward(self, image0, image1, image2, image3, iters=12, flow_init=None, test_mode=False):
+    def forward(self, image0, image1, image2, image3, iters=12, flow_init=None, test_mode=False, normalize = True):
         """ Estimate optical flow between pair of frames """
 
-        image0 = (2 * (image0 / 255.0) - 1.0).contiguous()
-        image1 = (2 * (image1 / 255.0) - 1.0).contiguous()
-        image2 = (2 * (image2 / 255.0) - 1.0).contiguous()
-        image3 = (2 * (image3 / 255.0) - 1.0).contiguous()
+        if normalize:
+            image0 = (2 * (image0 / 255.0) - 1.0).contiguous()
+            image1 = (2 * (image1 / 255.0) - 1.0).contiguous()
+            image2 = (2 * (image2 / 255.0) - 1.0).contiguous()
+            image3 = (2 * (image3 / 255.0) - 1.0).contiguous()
+        else:
+            image0 = image0.contiguous()
+            image1 = image1.contiguous()
+            image2 = image2.contiguous()
+            image3 = image3.contiguous()
+
 
         #Suppose that image0, image1 are vanilla images and have real batch size
         #Suppose that first n images of image2 and image3 are spacetime images of first batch and so on
